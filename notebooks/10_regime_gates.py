@@ -31,7 +31,7 @@ import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from strategy import (
     WINDOWS, StrategyParams,
@@ -393,12 +393,12 @@ def analyze_window(wkey: str):
     # Load baseline (already computed; re-run if missing)
     base_path = RESULTS / pair / 'none'
     if not (base_path / 'trades.parquet').exists():
-        print("  Baseline missing — running now...")
+        print("  Ungated missing — running now...")
         with _quiet():
             run_window(wkey, params_base, force=True)
     df_base, ts, stats_base = load_saved(pair, 'none')
 
-    print(f"\n  Baseline (no gate):")
+    print(f"\n  Ungated (no gate):")
     print(fmt_stats('none', stats_base))
     print(f"  RTH window: {cfg.rth_open}–{cfg.rth_close} UTC")
     print(f"  Trades: {len(df_base)}  ({len(df_base[df_base['direction']==1])} long, "
@@ -484,7 +484,7 @@ def analyze_window(wkey: str):
     in_aftnoon  = entry_hours >= aftnoon_start_h
     in_midday   = ~in_morning & ~in_aftnoon
 
-    print(f"\n  Baseline trade distribution by session:")
+    print(f"\n  Ungated trade distribution by session:")
     for mask, lbl in [(in_morning, 'Morning active'), (in_midday, 'Midday (gated)'),
                       (in_aftnoon, 'Afternoon active')]:
         sub = df_base[mask]

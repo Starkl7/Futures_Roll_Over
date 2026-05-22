@@ -1,7 +1,7 @@
 """Shared constants for all Supplementary_notebooks."""
 from pathlib import Path
 
-RESULTS_DIR = Path('../results')
+RESULTS_DIR = Path('../../results')
 SEAGATE_DIR = Path('/Volumes/SEAGATE/Databento_Futures')
 FIGS_DIR    = Path('figures')
 TICK        = 0.25

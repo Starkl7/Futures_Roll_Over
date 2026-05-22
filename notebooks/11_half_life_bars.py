@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from strategy import (
     WINDOWS, StrategyParams,
@@ -137,7 +137,7 @@ def analyze_window(wkey: str, cache: dict, hl_threshold: float = 1200.0):
     print(f"  WINDOW {wkey}: {cfg.front} → {cfg.back}  [threshold={hl_threshold/60:.0f} min]")
     print(f"{'='*72}")
 
-    # Baseline (no gate)
+    # Ungated (no gate)
     params_base = StrategyParams(n_lots=10, regime_gate='none')
     stats_base  = run_inline(wkey, params_base, cache)
     df_base = None

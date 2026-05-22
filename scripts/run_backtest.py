@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 from strategy import (
     WINDOWS, StrategyParams,
     load_sofr, load_dt_years, load_volume_gate, load_volume_arc,

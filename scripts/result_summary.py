@@ -8,7 +8,7 @@ Train / Test split
   OOS (out-of-sample) : W3 ESH5→ESM5 (Mar 2025) + W4 ESM5→ESU5 (Jun 2025)
 
 Strategy variants evaluated
-  Baseline : no regime gate
+  Ungated : no regime gate (z-score threshold only)
   V1       : drift_4h gate (block shorts when 4h RTH drift > 0.10 pts)
 
 Sessions per window
@@ -52,7 +52,7 @@ WINDOWS = {
     'W4': ('ESM5_ESU5_20250612', 'ESM5→ESU5', 'Jun-25', 'OOS'),
 }
 SESSIONS   = ['European', 'US_RTH', 'Post_close']
-GATES      = ['Baseline', 'V1']
+GATES      = ['Ungated', 'V1']
 ALL_LABELS = [f'{s}_{g}' for s in SESSIONS for g in GATES]
 
 
@@ -213,7 +213,7 @@ for wk, (wdir, label, period, split) in WINDOWS.items():
     print(f"  {wk:<6} {label:<12} {split:<5} {s['n']:>5}  {s['wr']:>6.1f}  {s['avg_g']:>+10.2f}  "
           f"{s['tot_n_10']:>+11.0f}  {s['mdd_10']:>+9.0f}  {s['sharpe']:>+10.4f}  {s['p']:>7.4f} {stars}")
 
-print(f"\n  Note: each trade appears in both Baseline and V1 outputs if the gate was inactive.")
+print(f"\n  Note: each trade appears in both Ungated and V1 outputs if the gate was inactive.")
 print(f"  IS windows (W1+W2) and OOS windows (W3+W4) reported below separately.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -369,7 +369,7 @@ for gate in GATES:
 
 section('7. US RTH SESSION — STRUCTURAL WEAKNESS (SHORT DRAG)')
 
-print(f"\n  Aggregate p-value across all 4 windows: ~0.91 (Baseline), ~0.51 (V1).")
+print(f"\n  Aggregate p-value across all 4 windows: ~0.91 (Ungated), ~0.51 (V1).")
 print(f"  Structurally flat. Short trades underperform in every window.\n")
 
 print(f"  {'Gate':<10} {'Dir':<7} {'n':>5}  {'WR%':>6}  {'avg_gross':>10}  {'avg_net':>9}  {'BE breach?':>11}")
@@ -389,7 +389,7 @@ for gate in GATES:
         breach = '✗ BELOW' if ag < TC else '✓ above'
         print(f"  {gate:<10} {dlabel:<7} {len(sub):>5}  {wr:>6.1f}  {ag:>+10.2f}  {an:>+9.2f}  {breach:>11}")
     # V1 separating line
-    df_base = pool(list(WINDOWS.keys()), f'US_RTH_Baseline')
+    df_base = pool(list(WINDOWS.keys()), f'US_RTH_Ungated')
     df_v1   = pool(list(WINDOWS.keys()), f'US_RTH_V1')
     base_shorts = df_base[df_base['direction']==-1]
     v1_shorts   = df_v1[df_v1['direction']==-1]
@@ -397,12 +397,12 @@ for gate in GATES:
         print(f"\n  Drift gate (V1) reduces short count: {len(base_shorts)} → {len(v1_shorts)} ({len(v1_shorts)/len(base_shorts)*100:.0f}% retained)")
         print(f"  Remaining V1 shorts avg_gross: {v1_shorts['gross_usd'].mean():+.2f} — still below break-even")
 
-# Per-window breakdown for US_RTH_Baseline
-print(f"\n  US_RTH Baseline — per-window L/S split:")
+# Per-window breakdown for US_RTH_Ungated
+print(f"\n  US_RTH Ungated — per-window L/S split:")
 print(f"  {'Window':<6} {'Long n':>7} {'Long avg':>9} {'Short n':>8} {'Short avg':>10}")
 print(f"  {'─'*6} {'─'*7} {'─'*9} {'─'*8} {'─'*10}")
 for wk, (wdir, wlabel, period, split) in WINDOWS.items():
-    df = load_trades(wdir, 'US_RTH_Baseline')
+    df = load_trades(wdir, 'US_RTH_Ungated')
     if df.empty: continue
     lg  = df[df['direction']== 1]
     sh  = df[df['direction']==-1]
@@ -643,10 +643,10 @@ for label in ALL_LABELS:
 section('13. FINAL ASSESSMENT')
 
 # Compute the key numbers for the verdict
-eur_all_df  = pool(list(WINDOWS.keys()), 'European_Baseline')
+eur_all_df  = pool(list(WINDOWS.keys()), 'European_Ungated')
 eur_nets    = eur_all_df['gross_usd'] - TC
 _, eur_p    = spstats.ttest_1samp(eur_nets, 0.0)
-eur_oos_df  = pool(OOS_WINS, 'European_Baseline')
+eur_oos_df  = pool(OOS_WINS, 'European_Ungated')
 eur_oos_net = (eur_oos_df['gross_usd'] - TC).mean()
 
 # IS→OOS rank correlation
@@ -661,7 +661,7 @@ print(f"""
 
   1. European session is the only statistically significant source of edge.
      Cross-window (n=205): p={eur_p:.4f}, avg_net=+${eur_nets.mean():.2f}/lot.
-     The edge persists OOS: European Baseline OOS avg_net=+${eur_oos_net:.2f}/lot.
+     The edge persists OOS: European Ungated OOS avg_net=+${eur_oos_net:.2f}/lot.
      But individual windows range from near-zero (W2, FOMC-impacted) to +$7/lot (W1,W3).
 
   2. US RTH is structurally flat (p≈0.91 aggregate). Short trades are the culprit:
@@ -669,8 +669,8 @@ print(f"""
      reduces shorts but doesn't eliminate the problem. This session should not
      be traded independently.
 
-  3. Post_close shows modest signal (p=0.083 Baseline cross-window) but loses
-     significance under V1 filtering (p=0.24). Sample is thin (n=122 Baseline).
+  3. Post_close shows modest signal (p=0.083 Ungated cross-window) but loses
+     significance under V1 filtering (p=0.24). Sample is thin (n=122 Ungated).
 
   4. IS → OOS generalisation is reasonable at the session-ranking level
      (ρ ≈ {rho_val:.2f}), but with only 2 IS and 2 OOS windows this is
@@ -693,7 +693,7 @@ print(f"""
   → Volatility-scale SL for HC add-on (SL in z-units, not spread points).
   → Collect ≥4 more roll windows before making deployment decision.
   → Separate European session as the focused tradeable; US_RTH as marginal.
-  → European Baseline at 10 lots × $4.66 avg_net × ~50 trades/window
+  → European Ungated at 10 lots × $4.66 avg_net × ~50 trades/window
     = ~$2,330 expected net per window (4 windows/year = ~$9,300/yr at 10 lots).
     Scales linearly. At 100 lots: ~$93,000/yr, but execution assumptions break.
 """)
@@ -708,9 +708,9 @@ _OOS_WDIRS = [
     Path(__file__).parent.parent / "results" / "ESM5_ESU5_20250612",
 ]
 _SESSIONS_ALL = [
-    "European_Baseline", "European_V1",
-    "US_RTH_Baseline",   "US_RTH_V1",
-    "Post_close_Baseline","Post_close_V1",
+    "European_Ungated", "European_V1",
+    "US_RTH_Ungated",   "US_RTH_V1",
+    "Post_close_Ungated","Post_close_V1",
 ]
 
 def _load_oos_pool(tag=None):
@@ -740,7 +740,7 @@ def _sharpe_boot(net_arr, n_boot=5000, ci=0.90):
 _TC8 = 8.04
 print(f"  {'Pool':<18} {'n':>5}  {'mean_net':>9}  {'std_net':>9}  {'Sharpe':>8}  {'90% CI'}")
 print(f"  {'-'*18} {'-'*5}  {'-'*9}  {'-'*9}  {'-'*8}  {'-'*20}")
-for label, tag in [("All OOS", None), ("Baseline only", "Baseline"), ("V1 only", "V1")]:
+for label, tag in [("All OOS", None), ("Ungated only", "Ungated"), ("V1 only", "V1")]:
     df = _load_oos_pool(tag)
     net = (df["gross_usd"] - _TC8).values
     s, lo, hi = _sharpe_boot(net)

@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 from strategy import (
     WINDOWS, StrategyParams,
     load_sofr, load_dt_years, load_volume_gate,
@@ -278,7 +278,7 @@ def plot_cross_window(w1_sweep: pd.DataFrame, w2_sweep: pd.DataFrame,
         for col_idx, metric in enumerate(['pf', 'avg_gross']):
             ax = axes[row_idx][col_idx]
             baseline_val = base['pf'] if metric == 'pf' else base['avg_gross']
-            ax.axhline(baseline_val, color='k', lw=1.5, ls='--', label='Baseline')
+            ax.axhline(baseline_val, color='k', lw=1.5, ls='--', label='Ungated')
             for win in WINDOWS_MINS:
                 sub = sweep[sweep['window_min'] == win].sort_values('threshold')
                 if sub.empty:

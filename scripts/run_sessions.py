@@ -2,7 +2,7 @@
 """
 run_sessions.py — Multi-window, multi-session backtest runner.
 
-For each of W1–W4, runs Baseline (none gate) and V1 (drift_4h gate) across
+For each of W1–W4, runs Ungated (none gate) and V1 (drift_4h gate) across
 three independently-windowed sub-sessions:
   European   07:00 → RTH_open
   US_RTH     RTH_open → RTH_close
@@ -24,7 +24,7 @@ import scipy.stats as spstats
 from dataclasses import dataclass
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 from strategy import (
     WINDOWS, WindowConfig, StrategyParams,
     load_sofr, load_dt_years, load_volume_gate,
@@ -60,7 +60,7 @@ SESSION_MAP = {
 }
 
 GATES = {
-    'Baseline': 'none',
+    'Ungated': 'none',
     'V1':       'drift_4h',
 }
 
@@ -346,8 +346,8 @@ def main():
         # ── Summary table ──────────────────────────────────────────────────
         print_window_results(wkey, window_results)
 
-        # ── Lot-scaling analysis on US_RTH Baseline ────────────────────────
-        rth_stats = window_results.get(('US_RTH', 'Baseline'))
+        # ── Lot-scaling analysis on US_RTH Ungated ────────────────────────
+        rth_stats = window_results.get(('US_RTH', 'Ungated'))
         if rth_stats and rth_stats['n'] > 0:
             print_lot_scaling(rth_stats)
 
