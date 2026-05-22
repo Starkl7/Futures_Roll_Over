@@ -49,7 +49,7 @@ Phi → 0 near equilibrium (unit-root regime); Phi → 1 far from equilibrium (f
 | IS  (W1+W2) | 3,000 | −$4.36 | <0.001\*\*\* | [−$4.58, −$4.15] | −0.71 |
 | OOS (W3+W4) | 1,782 | −$4.00 | <0.001\*\*\* | [−$4.27, −$3.74] | −0.70 |
 
-The naive ESTAR parameterisation fails on 1-second intraday bars: the mean-reversion exit (`|z| < 0.25`) fires at the first tick-back, producing hold times of ~0 minutes and 4,782 trades across 4 windows. The $8.04/lot TC destroys all gross edge. This provides the lower-performance reference against which V1 is measured.
+The naive ESTAR parameterisation fails on 1-second intraday bars: the mean-reversion exit (`|z| < 0.25`) fires at the first tick-back, producing hold times of ~0 minutes and 4,782 trades across 4 windows. The $8.04/lot TC destroys all gross edge.
 
 ### Internal baseline: Z-score Ungated
 
