@@ -7,3 +7,5 @@ data/
 results/
 CLAUDE.md
 reports/
+QC_backtest/
+QC_backtest_analysis/
