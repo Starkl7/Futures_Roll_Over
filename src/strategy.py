@@ -599,13 +599,14 @@ _OFI_CACHE_DIR = Path(__file__).parent.parent / 'results' / 'ofi_cache'
 def _compute_drift_4h_gate(spread: pd.Series,
                             params: StrategyParams) -> tuple[np.ndarray, np.ndarray]:
     """
-    RTH 4-hour intraday drift gate (shorts only) — strategy v1.
+    RTH 4-hour intraday drift gate — symmetric.
 
     Blocks a short entry at bar i when:
-        spread[i] - spread[max(session_start_bar, i - 14400)] > drift_4h_threshold
+        spread[i] - spread[anchor] > +drift_4h_threshold   (spread drifted up)
+    Blocks a long  entry at bar i when:
+        spread[i] - spread[anchor] < -drift_4h_threshold   (spread drifted down)
 
     Lookback clips to the current session start so no overnight data bleeds in.
-    Longs are never blocked by this gate.
 
     Returns (long_blocked, short_blocked).
     """
@@ -621,13 +622,17 @@ def _compute_drift_4h_gate(spread: pd.Series,
         if d not in sess_start:
             sess_start[d] = i
 
+    long_blocked  = np.zeros(n, dtype=bool)
     short_blocked = np.zeros(n, dtype=bool)
     for i in range(n):
         anchor = max(sess_start[dates[i]], i - lookback)
-        if prices[i] - prices[anchor] > threshold:
+        drift  = prices[i] - prices[anchor]
+        if drift >  threshold:
             short_blocked[i] = True
+        if drift < -threshold:
+            long_blocked[i]  = True
 
-    return np.zeros(n, dtype=bool), short_blocked   # longs never blocked
+    return long_blocked, short_blocked
 
 
 def _compute_ofi_gate(spread: pd.Series, cfg, params) -> tuple[np.ndarray, np.ndarray]:

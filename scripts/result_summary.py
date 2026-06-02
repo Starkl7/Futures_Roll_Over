@@ -51,9 +51,11 @@ WINDOWS = {
     'W3': ('ESH5_ESM5_20250313', 'ESH5→ESM5', 'Mar-25', 'OOS'),
     'W4': ('ESM5_ESU5_20250612', 'ESM5→ESU5', 'Jun-25', 'OOS'),
 }
-SESSIONS   = ['European', 'US_RTH', 'Post_close']
-GATES      = ['Ungated', 'V1']
-ALL_LABELS = [f'{s}_{g}' for s in SESSIONS for g in GATES]
+SESSIONS       = ['European', 'US_RTH', 'Post_close']
+GATES          = ['Ungated', 'V1']
+ALL_LABELS     = [f'{s}_{g}' for s in SESSIONS for g in GATES]
+V1_LABELS      = [f'{s}_V1'      for s in SESSIONS]  # strategy: drift_4h gate + HC
+UNGATED_LABELS = [f'{s}_Ungated' for s in SESSIONS]  # benchmark: z-score only
 
 
 # ── Helper functions ───────────────────────────────────────────────────────────
@@ -308,22 +310,22 @@ for split_label, split_key, wkeys in [('IN-SAMPLE (W1+W2)', 'IS', IS_WINS), ('OU
         totals_g   += s['tot_g_10']
         totals_n_usd += s['tot_n_10']
 
-    # Grand row
-    all_df = pool(wkeys, ALL_LABELS[0])
-    agg_parts = []
-    for label in ALL_LABELS:
-        df = pool(wkeys, label)
-        if not df.empty:
-            agg_parts.append(df)
-    if agg_parts:
-        agg = pd.concat(agg_parts, ignore_index=True)
-        s   = stats(agg)
-        print(f"  {'─'*22}  {'─'*5}  {'─'*6}  {'─'*10}  {'─'*9}  {'─'*13}  {'─'*11}  {'─'*5}  {'─'*7}  {'─'*7}")
-        stars = sig_stars(s['p'])
-        print(f"  {'AGGREGATE':<22}  {s['n']:>5}  {s['wr']:>6.1f}  {s['avg_g']:>+10.2f}  "
-              f"{s['avg_n']:>+9.2f}  {s['tot_g_10']:>+13.0f}  {s['tot_n_10']:>+11.0f}  "
-              f"{'—':>5}  {s['sharpe']:>+7.4f}  {s['p']:>7.4f} {stars}")
-        print(f"  95% CI avg_net/lot: {fmt_ci(s['ci_lo'], s['ci_hi'])}")
+    # Aggregate rows — V1 (strategy) and Ungated (benchmark) kept separate
+    print(f"  {'─'*22}  {'─'*5}  {'─'*6}  {'─'*10}  {'─'*9}  {'─'*13}  {'─'*11}  {'─'*5}  {'─'*7}  {'─'*7}")
+    for agg_tag, agg_lset in [('V1 (strategy)', V1_LABELS), ('Ungated (bench)', UNGATED_LABELS)]:
+        agg_parts = []
+        for label in agg_lset:
+            df = pool(wkeys, label)
+            if not df.empty:
+                agg_parts.append(df)
+        if agg_parts:
+            agg   = pd.concat(agg_parts, ignore_index=True)
+            s     = stats(agg)
+            stars = sig_stars(s['p'])
+            print(f"  {agg_tag:<22}  {s['n']:>5}  {s['wr']:>6.1f}  {s['avg_g']:>+10.2f}  "
+                  f"{s['avg_n']:>+9.2f}  {s['tot_g_10']:>+13.0f}  {s['tot_n_10']:>+11.0f}  "
+                  f"{'—':>5}  {s['sharpe']:>+7.4f}  {s['p']:>7.4f} {stars}")
+            print(f"  95% CI avg_net/lot: {fmt_ci(s['ci_lo'], s['ci_hi'])}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECTION 6 — EUROPEAN SESSION: PRIMARY ALPHA SOURCE
@@ -416,7 +418,7 @@ section('8. Z-SCORE SEGMENTATION AT FILL')
 
 all_parts = []
 for wk, (wdir, *_) in WINDOWS.items():
-    for label in ALL_LABELS:
+    for label in V1_LABELS:  # V1 only — sessions are mutually exclusive, no dedup needed
         df = load_trades(wdir, label)
         if not df.empty:
             df['window'] = wk
@@ -468,7 +470,7 @@ section('9. HIGH-CONVICTION ADD-ON (HC) — DOES LOT DOUBLING ADD VALUE?')
 
 hc_parts, nohc_parts = [], []
 for wk, (wdir, *_) in WINDOWS.items():
-    for label in ALL_LABELS:
+    for label in V1_LABELS:  # HC only applies to V1 strategy
         df = load_trades(wdir, label)
         if df.empty or 'hc_addon' not in df.columns:
             continue
@@ -500,7 +502,7 @@ print(f"\n  HC by window (10-lot-equiv basis):")
 print(f"  {'Window':<6}  {'Split':<5}  {'n':>4}  {'WR%':>6}  {'avg_g(10-eq)':>13}  {'avg_g/lot':>10}  {'verdict':>12}")
 print(f"  {'─'*6}  {'─'*5}  {'─'*4}  {'─'*6}  {'─'*13}  {'─'*10}  {'─'*12}")
 for wk, (wdir, wlabel, period, split) in WINDOWS.items():
-    wdfs = [df for df in [load_trades(wdir, label) for label in ALL_LABELS] if not df.empty and 'hc_addon' in df.columns]
+    wdfs = [df for df in [load_trades(wdir, label) for label in V1_LABELS] if not df.empty and 'hc_addon' in df.columns]
     if not wdfs: continue
     wdf = pd.concat(wdfs, ignore_index=True)
     hcw = wdf[wdf['hc_addon']==True]
@@ -573,38 +575,37 @@ print(f"""
   └─────────────────────────────────────────────────────────────────────────────┘
 """)
 
-# Compute IS and OOS aggregate t-tests
-for split_label, wkeys in [('IS  (W1+W2)', IS_WINS), ('OOS (W3+W4)', OOS_WINS)]:
-    agg_parts = []
-    for label in ALL_LABELS:
-        df = pool(wkeys, label)
-        if not df.empty:
-            agg_parts.append(df)
-    if not agg_parts: continue
-    agg  = pd.concat(agg_parts, ignore_index=True)
-    nets = agg['gross_usd'] - TC
-    t, p = spstats.ttest_1samp(nets, 0.0)
-    ci   = spstats.t.interval(0.95, df=len(nets)-1, loc=nets.mean(), scale=nets.sem())
-    stars= sig_stars(p)
-    print(f"  {split_label}: n={len(nets)}  avg_net={nets.mean():+.2f}/lot  t={t:.3f}  p={p:.4f} {stars}  "
-          f"95%CI=[{ci[0]:+.2f}, {ci[1]:+.2f}]")
+# Aggregate t-tests — V1 (strategy) and Ungated (benchmark) kept separate
+for variant_tag, lset in [('V1 strategy   ', V1_LABELS), ('Ungated bench ', UNGATED_LABELS)]:
+    for split_label, wkeys in [('IS  (W1+W2)', IS_WINS), ('OOS (W3+W4)', OOS_WINS)]:
+        agg_parts = []
+        for label in lset:
+            df = pool(wkeys, label)
+            if not df.empty:
+                agg_parts.append(df)
+        if not agg_parts: continue
+        agg  = pd.concat(agg_parts, ignore_index=True)
+        nets = agg['gross_usd'] - TC
+        t, p = spstats.ttest_1samp(nets, 0.0)
+        ci   = spstats.t.interval(0.95, df=len(nets)-1, loc=nets.mean(), scale=nets.sem())
+        stars= sig_stars(p)
+        print(f"  [{variant_tag}] {split_label}: n={len(nets)}  avg_net={nets.mean():+.2f}/lot  "
+              f"t={t:.3f}  p={p:.4f} {stars}  95%CI=[{ci[0]:+.2f}, {ci[1]:+.2f}]")
+    print()
 
-# European only
+# European only — V1 and Ungated separately
 print()
-for split_label, wkeys in [('IS  European only', IS_WINS), ('OOS European only', OOS_WINS)]:
-    agg_parts = []
-    for label in [f'European_{g}' for g in GATES]:
-        df = pool(wkeys, label)
-        if not df.empty:
-            agg_parts.append(df)
-    if not agg_parts: continue
-    agg  = pd.concat(agg_parts, ignore_index=True)
-    nets = agg['gross_usd'] - TC
-    t, p = spstats.ttest_1samp(nets, 0.0)
-    ci   = spstats.t.interval(0.95, df=len(nets)-1, loc=nets.mean(), scale=nets.sem())
-    stars= sig_stars(p)
-    print(f"  {split_label}: n={len(nets)}  avg_net={nets.mean():+.2f}/lot  t={t:.3f}  p={p:.4f} {stars}  "
-          f"95%CI=[{ci[0]:+.2f}, {ci[1]:+.2f}]")
+for variant_tag, eur_label in [('V1 strategy   ', 'European_V1'), ('Ungated bench ', 'European_Ungated')]:
+    for split_label, wkeys in [('IS  European', IS_WINS), ('OOS European', OOS_WINS)]:
+        df = pool(wkeys, eur_label)
+        if df.empty: continue
+        nets = df['gross_usd'] - TC
+        t, p = spstats.ttest_1samp(nets, 0.0)
+        ci   = spstats.t.interval(0.95, df=len(nets)-1, loc=nets.mean(), scale=nets.sem())
+        stars= sig_stars(p)
+        print(f"  [{variant_tag}] {split_label}: n={len(nets)}  avg_net={nets.mean():+.2f}/lot  "
+              f"t={t:.3f}  p={p:.4f} {stars}  95%CI=[{ci[0]:+.2f}, {ci[1]:+.2f}]")
+    print()
 
 print(f"""
   Power caveat: 2 IS windows and 2 OOS windows is an extremely thin evaluation basis.

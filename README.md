@@ -20,7 +20,7 @@ where `r_f` = SOFR (via FRED), `q` = S&P 500 trailing dividend yield (~1.30%), a
 
 **Signal:** Enter when the z-score of `(spread − FV)` crosses ±2.5σ on a 10-minute rolling window (edge-triggered; fill executes at T+1). Exit uses a standard two-layer TP/SL: 90% of position at +0.50 pt (SL moves to breakeven) and 10% at +0.75 pt. Low-z overlay: entries with |entry\_z| < 2.0 at fill time use a single layer at +0.25 pt instead. Position sizing is 10 lots per signal.
 
-**HC add-on:** When |z\_fill| > 3.0 at the T+1 fill bar, an unconditional 10-lot add-on executes at T+2, doubling the position to 20 lots with a blended entry price. The add-on is gated only by the same FOMC exclusion as the primary signal.
+**HC add-on:** When |z\_fill| > 3.0 at the T+1 fill bar, an unconditional 10-lot add-on executes at T+2, doubling the position to 20 lots with a blended entry price. The add-on is gated only by the same FOMC exclusion as the primary signal. Across all 4 windows: n=117 HC trades, WR=76.1%, avg net/lot=+$2.86. Conditional on window volatility: W1/W2/W4 positive (WR 72–80%), W3 marginal (one gap trade −$4,312 at 2× lots on 2025-03-14). Fixed-point SL does not scale with window sigma.
 
 **Session decomposition:** Three session types analyzed — European (07:00–12:29 UTC), US RTH (13:30–20:15 UTC), Post-close — with European session identified as the primary alpha source.
 
@@ -55,10 +55,10 @@ The naive ESTAR parameterisation fails on 1-second intraday bars: the mean-rever
 
 The same z-score signal with no regime gate (`regime_gate='none'`).
 
-| Pool | n | avg\_net/lot | p-value |
-|------|---|-------------|---------|
-| IS  aggregate | 554 | +$1.17 | 0.198 |
-| OOS aggregate | 670 | +$2.01 | 0.027\*\* |
+| Split | n | avg\_net/lot | p-value |
+|-------|---|-------------|---------|
+| IS  (W1+W2) | 308 | +$1.09 | 0.365 |
+| OOS (W3+W4) | 371 | +$1.64 | 0.264 |
 
 ---
 
@@ -82,14 +82,23 @@ The same z-score signal with no regime gate (`regime_gate='none'`).
 
 *ESTAR exits at the first tick-back on 1-second bars (hold_med = 0 min), turning all gross edge into TC loss. Ungated and V1 achieve positive per-lot returns; V1 widens the margin in OOS (+$2.47 vs +$1.64/lot).*
 
-V1 adds a `drift_4h` regime gate (block shorts during sustained bullish RTH drift) over the ungated signal.
+V1 adds a `drift_4h` regime gate (symmetric: block entries in the direction of sustained intraday drift, ±0.10 pt threshold, 4-hour lookback) over the ungated signal.
 
-| Pool | n | Avg Net/Lot | p-value | 90% CI |
-|------|---|-------------|---------|--------|
-| IS  all (W1+W2) | 554 | +$1.17 | 0.198 | [−$0.61, +$2.94] |
-| OOS all (W3+W4) | 670 | +$2.01 | 0.027\*\* | [+$0.24, +$3.79] |
-| OOS European | 190 | +$5.15 | <0.001\*\*\* | [+$3.10, +$7.21] |
-| OOS V1 gate | 299 | +$2.47 | — | Sharpe CI [+0.06, +0.27] |
+**V1 (strategy):**
+
+| Split | n | Avg Net/Lot | p-value | 95% CI |
+|-------|---|-------------|---------|--------|
+| IS  (W1+W2) | 246 | +$1.26 | 0.361 | [−$1.45, +$3.96] |
+| OOS (W3+W4) | 299 | **+$2.47** | **0.006\*\*\*** | [+$0.70, +$4.25] |
+| OOS European | 90 | +$3.90 | 0.013\*\* | [+$0.85, +$6.96] |
+
+**Ungated (benchmark):**
+
+| Split | n | Avg Net/Lot | p-value | 95% CI |
+|-------|---|-------------|---------|--------|
+| IS  (W1+W2) | 308 | +$1.09 | 0.365 | [−$1.28, +$3.46] |
+| OOS (W3+W4) | 371 | +$1.64 | 0.264 | [−$1.24, +$4.52] |
+| OOS European | 100 | +$6.28 | <0.001\*\*\* | [+$3.48, +$9.08] |
 
 **V1 vs Z-score Ungated:**
 
@@ -101,7 +110,7 @@ V1 adds a `drift_4h` regime gate (block shorts during sustained bullish RTH drif
 | OOS per-trade Sharpe | +0.058 | **+0.159** |
 | Annualized Sharpe (OOS) | — | **+3.88** (90% CI: [+1.38, +6.63]) |
 
-**Verdict:** *Marginal positive edge; not yet deployable.* Only the European session achieves statistically significant edge. Evaluation is underpowered (4 roll windows); proper OOS requires ≥10 periods.
+**Verdict:** *Marginal positive edge; not yet deployable.* V1 achieves statistically significant OOS edge overall (p=0.006\*\*\*) and in the European session (p=0.013\*\*). Ungated OOS is not significant (p=0.264), confirming the drift gate carries the edge. Evaluation is underpowered (4 roll windows); proper OOS requires ≥10 periods. IS→OOS rank correlation (Spearman) ρ=0.771.
 
 **Roll windows:**
 
@@ -111,6 +120,15 @@ V1 adds a `drift_4h` regime gate (block shorts during sustained bullish RTH drif
 | W2 | ESZ4 → ESH5 | Dec 16, 2024 | In-sample |
 | W3 | ESH5 → ESM5 | Mar 17, 2025 | Out-of-sample |
 | W4 | ESM5 → ESU5 | Jun 16, 2025 | Out-of-sample |
+
+**Per-window results (all sessions combined, V1):**
+
+| Window | n | WR | Net P&L ×10 | p |
+|--------|---|----|-------------|---|
+| W1 ESU4→ESZ4 (IS) | 187 | 86.6% | +$6,309 | 0.016\*\* |
+| W2 ESZ4→ESH5 (IS) | 204 | 71.1% | −$4,539 | 0.174 |
+| W3 ESH5→ESM5 (OOS) | 300 | 88.3% | +$4,680 | 0.354 |
+| W4 ESM5→ESU5 (OOS) | 163 | 85.9% | +$4,607 | 0.050\*\* |
 
 ---
 
@@ -211,7 +229,7 @@ Five alpha signals were evaluated across W1 and W2:
 - **FOMC event-driven jump** — implemented as full-day exclusion filter only
 
 Eight regime gates were evaluated; two were accepted into V1:
-1. **drift_4h gate** — blocks short entries during sustained bullish RTH drift (4-hour lookback); saved +$134 IS
+1. **drift_4h gate** — symmetric gate: blocks entries in the direction of sustained intraday drift (4-hour lookback, ±0.10 pt threshold); short-blocking arm saved +$134 IS; long-blocking arm empirically inactive across all 4 windows (spread has structural upward intraday drift during ES roll periods)
 2. **low-z two-layer exit** — modified exit for |z| < 2.0 bucket; saved +$58 IS
 
 ---
